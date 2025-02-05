@@ -54,7 +54,7 @@ actionServer verbosity cmd@ServerOpts{..} = do
     -- so I can get good error messages
     hSetBuffering stdout LineBuffering
     hSetBuffering stderr LineBuffering
-    putStrLn $ "Server started on port " ++ show port
+    putStrLn $ "Server started on " ++ showEndpoint endpoint
     putStr "Reading log..." >> hFlush stdout
     time <- offsetTime
     log <- logCreate (if logs == "" then Left stdout else Right logs) $

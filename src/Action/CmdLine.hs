@@ -11,6 +11,9 @@ module Action.CmdLine(
     ServerOpts(..),
     ReplayOpts(..),
     TestOpts(..),
+    -- * Endpoints
+    ServerEndpoint(..),
+    showEndpoint,
     -- * Parsing command line
     getCmdLine, defaultDatabaseLang,
     -- * Verbosity
@@ -67,7 +70,7 @@ data GenerateOpts
 
 data ServerOpts
     = ServerOpts
-        { port :: Int
+        { endpoint :: ServerEndpoint
         , database :: FilePath
         , cdn :: String
         , logs :: FilePath
@@ -76,7 +79,6 @@ data ServerOpts
         , links :: Bool
         , scope :: String
         , home :: String
-        , host :: String
         , https :: Bool
         , cert :: FilePath
         , key :: FilePath
@@ -105,6 +107,14 @@ data Mode
     | Server ServerOpts
     | Replay ReplayOpts
     | Test TestOpts
+
+data ServerEndpoint
+    = UnixSocket FilePath
+    | TcpSocket String Int
+
+showEndpoint :: ServerEndpoint -> String
+showEndpoint (TcpSocket host port) = "port " <> show port <> " on host " <> host
+showEndpoint (UnixSocket sock) = "socket " <> sock
 
 defaultDatabaseLang :: IO FilePath
 defaultDatabaseLang = do
@@ -212,9 +222,20 @@ generateOpts = do
     debug <- switch (long "debug" <> help "Generate debug information")
     pure $ GenerateOpts {..}
 
+unixEndpoint :: Parser ServerEndpoint
+unixEndpoint =
+    UnixSocket <$> option str (long "socket" <> metavar "PATH" <> help "UNIX socket")
+
+tcpEndpoint :: Parser ServerEndpoint
+tcpEndpoint =
+    TcpSocket <$> host <*> port
+  where
+    host = option str (long "host" <> value "*" <> help "Set the host to bind on (e.g., an ip address; '!4' for ipv4-only; '!6' for ipv6-only; default: '*' for any host).")
+    port = option auto (long "port" <> short 'p' <> value 8080 <> metavar "PORT" <> help "Port number")
+
 serverOpts :: Parser ServerOpts
 serverOpts = do
-    port <- option auto (long "port" <> short 'p' <> value 8080 <> metavar "PORT" <> help "Port number")
+    endpoint <- unixEndpoint <|> tcpEndpoint
     database <- databaseFlag
     cdn <- option str (value "" <> metavar "URL" <> help "URL prefix to use")
     logs <- logsFlag
@@ -223,7 +244,6 @@ serverOpts = do
     scope <- scopeFlag
     links <- switch (long "links" <> help "Display extra links")
     home <- option str (long "home" <> value "https://hoogle.haskell.org" <> metavar "URL" <> help "Set the URL linked to by the Hoogle logo.")
-    host <- option str (long "host" <> value "" <> help "Set the host to bind on (e.g., an ip address; '!4' for ipv4-only; '!6' for ipv6-only; default: '*' for any host).")
     https <- switch (long "https" <> help "Start an https server (use --cert and --key to specify paths to the .pem files)")
     cert <- option str (value "cert.pem" <> metavar "FILE" <> help "Path to the certificate pem file (when running an https server)")
     key <- option str (long "key" <> short 'k' <> value "key.pem" <> metavar "FILE" <> help "Path to the key pem file (when running an https server)")
