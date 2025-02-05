@@ -49,8 +49,8 @@ import Prelude
 
 import qualified Data.Aeson as JSON
 
-actionServer :: CmdLine -> IO ()
-actionServer cmd@Server{..} = do
+actionServer :: Verbosity -> ServerOpts -> IO ()
+actionServer verbosity cmd@ServerOpts{..} = do
     -- so I can get good error messages
     hSetBuffering stdout LineBuffering
     hSetBuffering stderr LineBuffering
@@ -66,8 +66,8 @@ actionServer cmd@Server{..} = do
     withSearch database $ \store ->
         server log cmd $ replyServer log local links haddock store cdn home (dataDir </> "html") scope
 
-actionReplay :: CmdLine -> IO ()
-actionReplay Replay{..} = withBuffering stdout NoBuffering $ do
+actionReplay :: Verbosity -> ReplayOpts -> IO ()
+actionReplay verbosity ReplayOpts{..} = withBuffering stdout NoBuffering $ do
     src <- readFile logs
     let qs = catMaybes [readInput url | _:ip:_:url:_ <- map words $ lines src, ip /= "-"]
     (t,_) <- duration $ withSearch database $ \store -> do

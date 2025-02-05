@@ -16,7 +16,6 @@ import qualified Data.Map.Strict as Map
 import Control.Monad.Extra
 import Data.Monoid
 import Data.Ord
-import System.Console.CmdArgs.Verbosity
 import Prelude
 
 import Output.Items
@@ -210,11 +209,11 @@ readHaskellHaddock timing settings docBaseDir = do
 
     where docDir name Package{..} = name ++ "-" ++ strUnpack packageVersion
 
-actionGenerate :: CmdLine -> IO ()
-actionGenerate g@Generate{..} = withTiming (if debug then Just $ replaceExtension database "timing" else Nothing) $ \timing -> do
+actionGenerate :: Verbosity -> GenerateOpts -> IO ()
+actionGenerate verbosity g@GenerateOpts{..} = withTiming (if debug then Just $ replaceExtension database "timing" else Nothing) $ \timing -> do
     putStrLn "Starting generate"
     createDirectoryIfMissing True $ takeDirectory database
-    whenLoud $ putStrLn $ "Generating files to " ++ takeDirectory database
+    whenLoud verbosity $ putStrLn $ "Generating files to " ++ takeDirectory database
 
     let warnFlagIgnored thisFlag reason ignoredFlagPred ignoredFlag =
           when ignoredFlagPred $ putStrLn $ "Warning: " <> thisFlag <> " is " <> reason <> ", which means " <> ignoredFlag <> " is ignored."
@@ -268,7 +267,7 @@ actionGenerate g@Generate{..} = withTiming (if debug then Just $ replaceExtensio
                             let missing = [x | x <- Set.toList $ want `Set.difference` seen
                                              , fmap packageLibrary (Map.lookup x cbl) /= Just False]
                             liftIO $ putStrLn ""
-                            liftIO $ whenNormal $ when (missing /= []) $ do
+                            liftIO $ whenNormal verbosity $ when (missing /= []) $ do
                                 putStrLn $ "Packages missing documentation: " ++ unwords (sortOn lower $ map unPackageName missing)
                             liftIO $ when (Set.null seen) $
                                 exitFail "No packages were found, aborting (use no arguments to index all of Stackage)"
@@ -297,10 +296,9 @@ actionGenerate g@Generate{..} = withTiming (if debug then Just $ replaceExtensio
         timed timing "Writing names" $ writeNames store xs
         timed timing "Writing types" $ writeTypes store (if debug then Just $ dropExtension database else Nothing) xs
 
-        x <- getVerbosity
-        when (x >= Loud) $
+        whenLoud verbosity $
             whenJustM getStatsDebug print
-        when (x >= Normal) $ do
+        whenNormal verbosity $ do
             whenJustM getStatsPeakAllocBytes $ \x ->
                 putStrLn $ "Peak of " ++ x ++ ", " ++ fromMaybe "unknown" itemsMemory ++ " for items"
 

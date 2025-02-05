@@ -81,8 +81,8 @@ forceBS (OutputFile x) = rnf x `seq` LBS.empty
 instance NFData Output where
     rnf x = forceBS x `seq` ()
 
-server :: Log -> CmdLine -> (Input -> IO Output) -> IO ()
-server log Server{..} act = do
+server :: Log -> ServerOpts -> (Input -> IO Output) -> IO ()
+server log ServerOpts{..} act = do
     let
         host' = fromString $
                   if host == "" then
