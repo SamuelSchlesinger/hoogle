@@ -33,8 +33,11 @@ import General.Util
 import Numeric.Extra
 import Paths_hoogle
 import Prelude
-import System.IO.Extra
+import System.Directory (renameFile)
+import System.FilePath (takeDirectory, takeFileName)
+import System.IO.Extra (Handle, hTell, hClose, hPutBuf)
 import System.IO.MMap
+import System.IO.Temp (withTempFile)
 import System.IO.Unsafe
 
 -- Ensure the string is always 25 chars long, so version numbers don't change its size
@@ -108,7 +111,7 @@ storeWriteFile :: FilePath -> (StoreWrite -> IO a) -> IO ([String], a)
 storeWriteFile file act = do
     atoms <- newIORef Map.empty
     parts <- newIORef Nothing
-    withBinaryFile file WriteMode $ \h -> do
+    withTempFile (takeDirectory file) (takeFileName file) $ \tmpFile h -> do
         -- put the version string at the start and end, so we can tell truncation vs wrong version
         BS.hPut h verString
         ref <- newIORef $ SW h (BS.length verString) []
@@ -130,6 +133,8 @@ storeWriteFile file act = do
         let stats = prettyTable 0 "Bytes" $
                 ("Overheads", intToDouble $ fromIntegral final - sum (map atomSize $ Map.elems atoms)) :
                 [(name ++ " :: " ++ atomType, intToDouble atomSize) | (name, Atom{..}) <- Map.toList atoms]
+        hClose h
+        renameFile tmpFile file
         pure (stats, res)
 
 storeWrite :: (Typeable (t a), Typeable a, Stored a) => StoreWrite -> t a -> a -> IO ()

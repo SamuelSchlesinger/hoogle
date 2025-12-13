@@ -80,6 +80,7 @@ library
         storable-tuple,
         tar,
         template-haskell,
+        temporary,
         text >= 2,
         time >= 1.5,
         transformers,
