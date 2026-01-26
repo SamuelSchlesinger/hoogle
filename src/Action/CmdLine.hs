@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ApplicativeDo #-}
 
 module Action.CmdLine(
@@ -21,13 +20,11 @@ module Action.CmdLine(
     whenLoud, whenNormal
     ) where
 
-import Data.List.Extra
 import Data.Version
 import General.Util
 import Paths_hoogle (version)
 import Options.Applicative as O
 import System.Directory
-import System.Environment
 import System.FilePath
 import System.IO
 import Control.Monad
@@ -39,7 +36,6 @@ data Verbosity = VerbosityNormal | VerbosityLoud
 whenLoud, whenNormal :: Verbosity -> IO () -> IO ()
 whenLoud v k = when (v >= VerbosityLoud) k
 whenNormal v k = when (v >= VerbosityNormal) k
-
 
 data SearchOpts
     = SearchOpts
@@ -139,49 +135,31 @@ defaultDatabaseLang = do
         pure legacyLocation
     pure $ dir </> "default-haskell-" ++ showVersion (trimVersion 3 version) ++ ".hoo"
 
--- N.B. This is rather awkward but seems to be the pragmatic way to migrate
--- away from cmdargs without changing the user-visible command-line syntax.
-fillInDatabase :: FilePath -> Mode -> Mode
-fillInDatabase defDb (Search opts)
-  | "" <- opts.database = Search $ opts { database = defDb }
-fillInDatabase defDb (Generate opts)
-  | "" <- opts.database = Generate $ opts { database = defDb }
-fillInDatabase defDb (Server opts)
-  | "" <- opts.database = Server $ opts { database = defDb }
-fillInDatabase defDb (Replay opts)
-  | "" <- opts.database = Replay $ opts { database = defDb }
-fillInDatabase defDb (Test opts)
-  | "" <- opts.database = Test $ opts { database = defDb }
-fillInDatabase _ mode = mode
-
 getCmdLine :: [String] -> IO (Verbosity, Mode)
 getCmdLine args = do
-    (verbosity, mode) <- execParser cmdline
-
-    -- fill in the default database TODO
-    --args <- if args.database /= "" then pure args else do
     defDb <- defaultDatabaseLang
-    pure (verbosity, fillInDatabase defDb mode)
+    (verbosity, mode) <- execParser (cmdline defDb)
+    pure (verbosity, mode)
 
-cmdline :: ParserInfo (Verbosity, Mode)
-cmdline =
+cmdline :: FilePath -> ParserInfo (Verbosity, Mode)
+cmdline defDb =
     O.info ((,) <$> verbosity <*> mode' <**> helper <**> simpleVersioner (showVersion version)) (header name)
   where
-    mode' = mode <|> fmap Search searchOpts
+    mode' = mode defDb <|> fmap Search (searchOpts defDb)
     verbosity = flag VerbosityNormal VerbosityLoud (short 'v' <> long "verbose" <> help "emit verbose output")
     name = "Hoogle " ++ showVersion version ++ ", https://hoogle.haskell.org/"
 
-mode :: Parser Mode
-mode = hsubparser
-    $  command "search" (O.info (Search <$> searchOpts) (progDesc "Perform a search"))
-    <> command "generate" (O.info (Generate <$> generateOpts) (progDesc "Generate Hoogle databases"))
-    <> command "serve" (O.info (Server <$> serverOpts) (progDesc "Start a Hoogle server"))
-    <> command "replay" (O.info (Replay <$> replayOpts) (progDesc "Replay a log file"))
-    <> command "test" (O.info (Test <$> testOpts) (progDesc "Run the test suite"))
+mode :: FilePath -> Parser Mode
+mode defDb = hsubparser
+    $  command "search" (O.info (Search <$> searchOpts defDb) (progDesc "Perform a search"))
+    <> command "generate" (O.info (Generate <$> generateOpts defDb) (progDesc "Generate Hoogle databases"))
+    <> command "serve" (O.info (Server <$> serverOpts defDb) (progDesc "Start a Hoogle server"))
+    <> command "replay" (O.info (Replay <$> replayOpts defDb) (progDesc "Replay a log file"))
+    <> command "test" (O.info (Test <$> testOpts defDb) (progDesc "Run the test suite"))
 
-databaseFlag :: Parser FilePath
-databaseFlag =
-    option str (long "database" <> short 'd' <> metavar "FILE" <> help "Name of database to use (use .hoo extension)")
+databaseFlag :: FilePath -> Parser FilePath
+databaseFlag defDb =
+    option str (long "database" <> short 'd' <> metavar "FILE" <> help "Name of database to use (use .hoo extension)" <> value defDb <> showDefault)
 
 logsFlag :: Parser FilePath
 logsFlag =
@@ -195,25 +173,25 @@ scopeFlag :: Parser String
 scopeFlag =
     option str (long "scope" <> short 's' <> help "Default scope to start with")
 
-searchOpts :: Parser SearchOpts
-searchOpts = do
+searchOpts :: FilePath -> Parser SearchOpts
+searchOpts defDb = do
     color <- optional $ switch (long "colour" <> help "Use colored output (requires ANSI terminal)")
     json <- switch (long "json" <> help "Get result as JSON")
     jsonl <- switch (long "jsonl" <> help "Get result as JSONL (JSON Lines)")
     link <- switch (long "link" <> help "Give URL's for each result")
     numbers <- switch (long "numbers" <> help "Give counter for each result")
     info <- switch (long "info" <> help "Give extended information about the first n results (set n with --count, default is 1)")
-    database <- databaseFlag
+    database <- databaseFlag defDb
     count <- optional $ option auto (short 'n' <> long "count" <> help "Maximum number of results to return (defaults to 10)")
     query <- some $ argument str (metavar "QUERY")
     repeat_ <- repeatFlag
     compare_ <- many $ option str (long "compare" <> metavar "SIG" <> help "Type signatures to compare against")
     pure $ SearchOpts {..}
 
-generateOpts :: Parser GenerateOpts
-generateOpts = do
+generateOpts :: FilePath -> Parser GenerateOpts
+generateOpts defDb = do
     download <- optional $ switch (long "download" <> help "Download all files from the web")
-    database <- databaseFlag
+    database <- databaseFlag defDb
     insecure <- switch (long "insecure" <> short 'i' <> help "Allow insecure HTTPS connections")
     include <- many $ argument str (metavar "PACKAGE" <> help "Packages to include")
     local_ <- many $ option (fromMaybe "" <$> optional str) (long "local" <> short 'l' <> help "Index local packages and link to local haddock docs")
@@ -233,10 +211,10 @@ tcpEndpoint =
     host = option str (long "host" <> value "*" <> help "Set the host to bind on (e.g., an ip address; '!4' for ipv4-only; '!6' for ipv6-only; default: '*' for any host).")
     port = option auto (long "port" <> short 'p' <> value 8080 <> metavar "PORT" <> help "Port number")
 
-serverOpts :: Parser ServerOpts
-serverOpts = do
+serverOpts :: FilePath -> Parser ServerOpts
+serverOpts defDb = do
     endpoint <- unixEndpoint <|> tcpEndpoint
-    database <- databaseFlag
+    database <- databaseFlag defDb
     cdn <- option str (value "" <> metavar "URL" <> help "URL prefix to use")
     logs <- logsFlag
     local <- switch (long "local" <> help "Allow following file:// links, restricts to 127.0.0.1  Set --host explicitely (including to '*' for any host) to override the localhost-only behaviour")
@@ -251,17 +229,17 @@ serverOpts = do
     no_security_headers <- switch (long "no-security-headers" <> short 'n' <> help "Don't send CSP security headers")
     pure ServerOpts {..}
 
-replayOpts :: Parser ReplayOpts
-replayOpts = do
+replayOpts :: FilePath -> Parser ReplayOpts
+replayOpts defDb = do
     logs <- logsFlag
-    database <- databaseFlag
+    database <- databaseFlag defDb
     repeat_ <- repeatFlag
     scope <- scopeFlag
     pure ReplayOpts {..}
 
-testOpts :: Parser TestOpts
-testOpts = do
+testOpts :: FilePath -> Parser TestOpts
+testOpts defDb = do
     deep <- switch (long "deep" <> help "Run extra long tests")
-    database <- databaseFlag
+    database <- databaseFlag defDb
     disable_network_tests <- switch (long "disable-network-tests" <> help "Disables the use of network tests")
     pure TestOpts {..}
