@@ -40,34 +40,34 @@ hoogle-mcp
 HOOGLE_DATABASE=/path/to/database.hoo hoogle-mcp
 ```
 
-### MCP Client Configuration
+### Claude Code Configuration
 
-To use with Claude Code, add to your `~/.claude/claude_desktop_config.json`:
+Use the `claude mcp add` command to register the server:
 
-```json
-{
-  "mcpServers": {
-    "hoogle": {
-      "command": "hoogle-mcp"
-    }
-  }
-}
+```bash
+# Add to current project (recommended - ties to project's resolver)
+claude mcp add hoogle /path/to/hoogle-mcp
+
+# Or add globally (available in all projects)
+claude mcp add --scope user hoogle /path/to/hoogle-mcp
+
+# With a custom database path
+claude mcp add -e HOOGLE_DATABASE=/path/to/database.hoo hoogle /path/to/hoogle-mcp
 ```
 
-Or with a custom database path:
+Verify the server is connected:
 
-```json
-{
-  "mcpServers": {
-    "hoogle": {
-      "command": "hoogle-mcp",
-      "env": {
-        "HOOGLE_DATABASE": "/path/to/your/database.hoo"
-      }
-    }
-  }
-}
+```bash
+claude mcp list
 ```
+
+**Note:** Project-local configuration is recommended because Hoogle databases should match your project's package resolver. Generate a project-specific database to index only the packages you're using.
+
+### Other MCP Clients
+
+For other MCP-compatible clients, configure a stdio server with:
+- **Command:** `hoogle-mcp` (or full path to the executable)
+- **Environment:** `HOOGLE_DATABASE=/path/to/database.hoo` (optional)
 
 ## Available Tools
 

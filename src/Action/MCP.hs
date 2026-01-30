@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | MCP (Model Context Protocol) server for Hoogle
 --
@@ -25,7 +24,6 @@ import System.IO (hFlush, stdout, stderr, hSetBuffering, BufferMode(..), stdin, 
 import Action.CmdLine (defaultDatabaseLang, Language(..))
 import Action.Search (search, targetInfo)
 import General.Store (storeReadFile, StoreRead)
-import General.Util (URL)
 import Input.Item (Target(..))
 import Query (Query, parseQuery)
 
@@ -111,11 +109,10 @@ instance ToJSON MCPContent where
         , "text" .= contentText
         ]
 
--- | Error codes
-errMethodNotFound, errInvalidParams, errInternalError :: Int
+-- | JSON-RPC error codes
+errMethodNotFound, errInvalidParams :: Int
 errMethodNotFound = -32601
 errInvalidParams = -32602
-errInternalError = -32603
 
 -- | Run the MCP server - main entry point
 --
