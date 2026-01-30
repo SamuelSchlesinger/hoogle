@@ -16,6 +16,7 @@ Hoogle can be used in several ways:
 * **From `emacs`**, by means of [`engine-mode`](https://github.com/hrs/engine-mode)
 * **[Installed locally](./docs/Install.md)**, with either a command line or in a browser
 * **[As a developer](./docs/API.md)**, through Haskell or JSON APIs.
+* **[With AI agents](./docs/MCP.md)**, through the MCP (Model Context Protocol) server
 
 # Searches
 
@@ -76,6 +77,20 @@ There is a terminal/curses based UI available through [`cabal install bhoogle`](
 **From the search bar:** Go to the [Hoogle website](https://hoogle.haskell.org/) in Firefox and click on the `⋯` symbol at the right of the URL bar, and select the "Add Search Engine" option. Click the hoogle logo at the bottom of the completion dropdown when searching to perform a Hoogle search.
 
 **As a keyword search:** With a keyword search you can type `h map` directly into the location bar to perform a Hoogle search. Go to the [Hoogle website](https://hoogle.haskell.org/) in Firefox, right-click in the Hoogle search field and select "Add a Keyword for this Search...". Given it a keyword such as "h".
+
+## MCP Server (AI Agents)
+
+Hoogle includes an MCP (Model Context Protocol) server that allows AI assistants like Claude to search Haskell libraries. To use it:
+
+```bash
+# Generate a database first
+hoogle generate
+
+# Run the MCP server
+hoogle-mcp
+```
+
+Configure your MCP client (e.g., Claude Code) to use `hoogle-mcp` as a server. See the [MCP documentation](./docs/MCP.md) for detailed setup instructions.
 
 ## Others
 
